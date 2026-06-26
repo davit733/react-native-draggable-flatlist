@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { findNodeHandle, LogBox } from "react-native";
+import { LogBox } from "react-native";
 import Animated, {
   useDerivedValue,
   useSharedValue,
@@ -11,6 +11,10 @@ import { useNestedAutoScroll } from "../hooks/useNestedAutoScroll";
 import { typedMemo } from "../utils";
 import { useStableCallback } from "../hooks/useStableCallback";
 import { FlatList } from "react-native-gesture-handler";
+
+type ScrollableRefWithNativeRef = React.Component & {
+  getNativeScrollRef?: () => React.Component | null;
+};
 
 function NestableDraggableFlatListInner<T>(
   props: DraggableFlatListProps<T>,
@@ -48,7 +52,9 @@ function NestableDraggableFlatListInner<T>(
   });
 
   const onListContainerLayout = useStableCallback(async ({ containerRef }) => {
-    const nodeHandle = findNodeHandle(scrollableRef.current);
+    const scrollableComponent = scrollableRef.current as ScrollableRefWithNativeRef | null;
+    const scrollableNode =
+      scrollableComponent?.getNativeScrollRef?.() || scrollableComponent;
 
     const onSuccess = (_x: number, y: number) => {
       listVerticalOffset.value = y;
@@ -56,8 +62,13 @@ function NestableDraggableFlatListInner<T>(
     const onFail = () => {
       console.log("## nested draggable list measure fail");
     };
+
+    if (!containerRef.current || !scrollableNode) {
+      return;
+    }
+
     //@ts-ignore
-    containerRef.current.measureLayout(nodeHandle, onSuccess, onFail);
+    containerRef.current.measureLayout(scrollableNode, onSuccess, onFail);
   });
 
   const onDragBegin: DraggableFlatListProps<T>["onDragBegin"] = useStableCallback(
